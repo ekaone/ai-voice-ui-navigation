@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
-import { UIState, UIAction } from '../types';
+import { createContext, useContext, useReducer, ReactNode } from "react";
+import { UIState, UIAction } from "../types";
 
 // Initial state with all components closed
 const initialState: UIState = {
@@ -10,23 +10,23 @@ const initialState: UIState = {
 // Reducer to handle UI state changes
 function uiReducer(state: UIState, action: UIAction): UIState {
   const { component, action: actionType } = action;
-  
+
   // If opening a component, close all others first
-  if (actionType === 'open') {
+  if (actionType === "open") {
     // Create a new state with all components closed
     const newState = Object.keys(state).reduce((acc, key) => {
       return { ...acc, [key]: false };
     }, {} as UIState);
-    
+
     // Then open the requested component
     return { ...newState, [component]: true };
   }
-  
+
   // If closing, just close the specified component
-  if (actionType === 'close') {
+  if (actionType === "close") {
     return { ...state, [component]: false };
   }
-  
+
   return state;
 }
 
@@ -41,11 +41,11 @@ const UIContext = createContext<UIContextType | undefined>(undefined);
 // Provider component
 export function UIProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(uiReducer, initialState);
-  
+
   const controlUI = (action: UIAction) => {
     dispatch(action);
   };
-  
+
   return (
     <UIContext.Provider value={{ state, controlUI }}>
       {children}
@@ -57,7 +57,7 @@ export function UIProvider({ children }: { children: ReactNode }) {
 export function useUI() {
   const context = useContext(UIContext);
   if (context === undefined) {
-    throw new Error('useUI must be used within a UIProvider');
+    throw new Error("useUI must be used within a UIProvider");
   }
   return context;
 }

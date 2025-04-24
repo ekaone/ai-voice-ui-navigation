@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from "react";
+import { useState, useCallback } from "react";
 import { useConversation } from "@11labs/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, Loader } from "lucide-react";
+import { Mic, MicOff } from "lucide-react";
 // component
 import { getSignedUrl } from "../lib/get-signed-url";
 import { useUI } from "../context/UIContext";
-import { UIAction, VoiceResponse } from "../types";
+import { UIAction } from "../types";
+import { ResponseBanner } from "./ResponseBanner"; // Import ResponseBanner
 
 async function requestMicrophonePermission() {
   try {
@@ -20,6 +21,7 @@ async function requestMicrophonePermission() {
 export function VoiceAssistant() {
   const { controlUI } = useUI();
   const [response, setResponse] = useState("");
+  const [speak, setSpeak] = useState(false);
 
   const conversation = useConversation({
     onMessage: ({ message }: { message: any }) => {
@@ -38,9 +40,11 @@ export function VoiceAssistant() {
     },
     onConnect: () => {
       console.log("Connected");
+      setSpeak(true);
     },
     onDisconnect: () => {
       console.log("Disconnected");
+      setSpeak(false);
     },
     onError: () => {
       console.error("Conversation error:");
@@ -48,8 +52,8 @@ export function VoiceAssistant() {
     },
   });
 
-  // Toggle recording state
-  const toggleRecording = async () => {
+  // Toggle conversation state
+  const toggleStartConversation = async () => {
     const hasPermission = await requestMicrophonePermission();
     if (!hasPermission) {
       alert("No permission");
@@ -81,65 +85,68 @@ export function VoiceAssistant() {
     });
   };
 
+  const toggleEndConversation = useCallback(async () => {
+    await conversation.endSession();
+    setSpeak(false);
+  }, [conversation]);
+
+  const triggerConversation = (speak: boolean) => {
+    if (speak) {
+      toggleStartConversation()
+        .then(() => setSpeak(true))
+        .catch((error) => {
+          console.error("Error starting conversation:", error);
+          setSpeak(false);
+        });
+    } else {
+      toggleEndConversation()
+        .then(() => setSpeak(false))
+        .catch((error) => {
+          console.error("Error ending conversation:", error);
+          setSpeak(true);
+        });
+    }
+  };
+
   return (
     <div className="flex flex-col items-center">
-      <motion.div
-        className="w-full bg-white/10 backdrop-blur-md rounded-xl p-5 mb-6 text-center"
-        animate={{ opacity: response ? 1 : 0.7 }}
-        transition={{ duration: 0.3 }}
-      >
-        <p className="text-white text-lg">
-          {response ||
-            'Try saying: "Show me the event schedule" or "What are the requirements?"'}
-        </p>
-      </motion.div>
-
-      <motion.button
-        onClick={toggleRecording}
-        className={`relative flex items-center justify-center w-16 h-16 rounded-full ${
-          conversation.status === "connected" ? "bg-red-500" : "bg-blue-500"
-        } text-white hover:shadow-lg`}
-        whileTap={{ scale: 0.95 }}
-        animate={{
-          scale: conversation.status === "connected" ? [1, 1.1, 1] : 1,
-        }}
-        transition={{
-          scale: {
-            repeat: conversation.status === "connected" ? Infinity : 0,
-            duration: 1.5,
-          },
-        }}
-      >
+      <ResponseBanner response={response} />
+      <div className="fixed bottom-16 right-6 z-30 flex flex-col items-center">
         <AnimatePresence mode="wait">
-          {conversation.status === "connected" ? (
-            <motion.div
+          {!speak ? (
+            <motion.button
               key="loading"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ duration: 0.2 }}
+              onClick={() => triggerConversation(true)}
+              className="z-30 items-center justify-center w-16 h-16 rounded-full bg-blue-500 text-white hover:shadow-lg"
+              whileTap={{ scale: 0.95 }}
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{ scale: { repeat: Infinity, duration: 1.5 } }}
+              title="Start Conversation"
+              aria-label="Start Conversation"
             >
-              <Mic size={24} />
-            </motion.div>
+              <Mic className="mx-auto block" size={24} />
+            </motion.button>
           ) : (
-            <motion.div
+            <motion.button
               key="mic-off"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ duration: 0.2 }}
+              onClick={() => triggerConversation(false)}
+              className="z-30 items-center justify-center w-16 h-16 rounded-full bg-red-500 text-white hover:shadow-lg"
+              whileTap={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              transition={{ scale: { repeat: 0, duration: 1.5 } }}
+              title="End Conversation"
+              aria-label="End Conversation"
             >
-              <MicOff size={24} />
-            </motion.div>
+              <MicOff className="mx-auto block" size={24} />
+            </motion.button>
           )}
         </AnimatePresence>
-      </motion.button>
-
-      <p className="text-gray-300 mt-3">
-        {conversation.status === "connected"
-          ? "Listening..."
-          : "Press to speak"}
-      </p>
+        <p className="text-gray-300 mt-3">
+          {conversation.status === "connected"
+            ? "Listening..."
+            : "Press to speak"}
+        </p>
+      </div>
     </div>
   );
 }
